@@ -2,12 +2,18 @@ import os
 import json
 import requests
 from flask import Flask, render_template, request, redirect, url_for, session
+from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'default_secret_key')
+app.secret_key = os.getenv('SECRET_KEY', 'super_secret_key_for_flask_session')
+
+# RenderなどのHTTPS/プロキシ環境でセッション(Cookie)を正常に機能させる設定
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+app.config['SESSION_COOKIE_SECURE'] = True      # HTTPS通信でのみCookieを保持
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'   # 外部サイト(Discord)からのリダイレクト時にCookieを維持
 
 CONFIG_FILE = 'config.json'
 
@@ -45,10 +51,11 @@ def index():
     
     # 管理者権限(8)またはサーバー管理権限(32)を持つサーバーのみ抽出
     admin_guilds = []
-    for g in guilds:
-        permissions = int(g.get('permissions', 0))
-        if (permissions & 0x8) == 0x8 or (permissions & 0x20) == 0x20:
-            admin_guilds.append(g)
+    if isinstance(guilds, list):
+        for g in guilds:
+            permissions = int(g.get('permissions', 0))
+            if (permissions & 0x8) == 0x8 or (permissions & 0x20) == 0x20:
+                admin_guilds.append(g)
 
     config = load_config()
     return render_template('dashboard.html', user=user, guilds=admin_guilds, config=config, saved=request.args.get('saved'))
@@ -79,13 +86,19 @@ def callback():
 
     if access_token:
         headers_auth = {'Authorization': f'Bearer {access_token}'}
-        # ユーザー情報
-        user_r = requests.get('https://discord.com/api/users/@me', headers=headers_auth)
-        session['user'] = user_r.json()
         
-        # 参加サーバー一覧
+        # ユーザー情報の取得
+        user_r = requests.get('https://discord.com/api/users/@me', headers=headers_auth)
+        if user_r.status_code == 200:
+            session['user'] = user_r.json()
+        
+        # 参加サーバー一覧の取得
         guilds_r = requests.get('https://discord.com/api/users/@me/guilds', headers=headers_auth)
-        session['guilds'] = guilds_r.json()
+        if guilds_r.status_code == 200:
+            session['guilds'] = guilds_r.json()
+
+        # セッションの保存を明示的に指定
+        session.modified = True
 
     return redirect(url_for('index'))
 
