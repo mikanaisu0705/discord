@@ -1,0 +1,8 @@
+{
+    "spam_interval": 3,
+    "spam_threshold": 5,
+    "account_age_days": 7,
+    "check_default_avatar": true,
+    "banned_words": "荒らし, たかし, test_bad_word,sex,下ネタ,",
+    "log_channel_id": "1526576980198428715"
+}

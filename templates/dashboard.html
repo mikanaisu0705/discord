@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anti-Raid Bot Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        discord: { bg: '#313338', card: '#2b2d31', sidebar: '#1e1f22', accent: '#5865F2' }
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-discord-bg text-gray-200 font-sans antialiased min-h-screen flex flex-col">
+
+    <header class="bg-discord-sidebar border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <i class="fa-solid text-2xl text-indigo-400 fa-shield-halved"></i>
+            <h1 class="text-xl font-bold tracking-wide text-white">Anti-Raid Bot 管理ダッシュボード</h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            {% if user %}
+                <div class="flex items-center space-x-3 bg-discord-card border border-gray-700 px-3 py-1.5 rounded-lg">
+                    <img src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png" class="w-7 h-7 rounded-full" alt="Avatar">
+                    <span class="text-sm font-medium text-white">{{ user.username }}</span>
+                    <a href="/logout" class="text-xs text-red-400 hover:underline ml-2">ログアウト</a>
+                </div>
+            {% else %}
+                <a href="/login" class="bg-discord-accent hover:bg-indigo-600 text-white font-medium px-4 py-2 rounded-lg transition-all flex items-center gap-2 shadow-lg">
+                    <i class="fa-brands fa-discord"></i> Discordでログイン
+                </a>
+            {% endif %}
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-5xl w-full mx-auto p-6 space-y-6">
+        
+        {% if saved %}
+            <div class="bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-xl flex items-center gap-3">
+                <i class="fa-solid fa-circle-check text-xl"></i>
+                <span>設定を正常に保存しました！Botへ即座に反映されます。</span>
+            </div>
+        {% endif %}
+
+        {% if user and guilds %}
+            <!-- 管理サーバー選択エリア -->
+            <div class="bg-discord-card border border-gray-800 rounded-xl p-4 shadow-lg space-y-3">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400">管理対象サーバーを選択</h3>
+                <div class="flex gap-3 overflow-x-auto pb-2">
+                    {% for g in guilds %}
+                        <div class="flex items-center gap-2 bg-discord-sidebar border border-indigo-500/50 px-3 py-2 rounded-lg cursor-pointer hover:border-indigo-400 transition">
+                            {% if g.icon %}
+                                <img src="https://cdn.discordapp.com/icons/{{ g.id }}/{{ g.icon }}.png" class="w-6 h-6 rounded-full">
+                            {% else %}
+                                <div class="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs font-bold">{{ g.name[0] }}</div>
+                            {% endif %}
+                            <span class="text-sm font-medium text-white whitespace-nowrap">{{ g.name }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <form action="/save" method="POST" class="space-y-6">
+            <div class="bg-discord-card border border-gray-800 rounded-xl p-6 shadow-lg flex items-center justify-between">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-1">セキュリティ設定</h2>
+                    <p class="text-sm text-gray-400">自動処分や検知しきい値を自由にコントロールします。</p>
+                </div>
+                <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/30 cursor-pointer">
+                    <i class="fa-solid fa-floppy-disk"></i> 設定を保存する
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- 自動処罰アクション -->
+                <div class="bg-discord-card border border-gray-800 rounded-xl p-6 shadow-lg space-y-4 md:col-span-2">
+                    <div class="flex items-center space-x-3 text-red-400 border-b border-gray-800 pb-3">
+                        <i class="fa-solid fa-gavel text-lg"></i>
+                        <h3 class="font-bold text-lg text-white">違反時の自動処罰設定</h3>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">処罰アクション</label>
+                            <select name="auto_punish" class="w-full bg-discord-sidebar border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500">
+                                <option value="none" {% if config.auto_punish == 'none' %}selected{% endif %}>警告と削除のみ（処罰なし）</option>
+                                <option value="timeout" {% if config.auto_punish == 'timeout' %}selected{% endif %}>自動タイムアウト（推奨）</option>
+                                <option value="ban" {% if config.auto_punish == 'ban' %}selected{% endif %}>即座にBAN</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-300 mb-2">タイムアウト時間（分）</label>
+                            <input type="number" name="timeout_minutes" value="{{ config.timeout_minutes }}" class="w-full bg-discord-sidebar border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- スパム検知 -->
+                <div class="bg-discord-card border border-gray-800 rounded-xl p-6 shadow-lg space-y-4">
+                    <div class="flex items-center space-x-3 text-indigo-400 border-b border-gray-800 pb-3">
+                        <i class="fa-solid fa-bolt text-lg"></i>
+                        <h3 class="font-bold text-lg text-white">スパム・連投検知</h3>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">判定時間（秒）</label>
+                        <input type="number" name="spam_interval" value="{{ config.spam_interval }}" class="w-full bg-discord-sidebar border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">許容する連続発言回数</label>
+                        <input type="number" name="spam_threshold" value="{{ config.spam_threshold }}" class="w-full bg-discord-sidebar border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+                <!-- 怪しいアカウント検知 -->
+                <div class="bg-discord-card border border-gray-800 rounded-xl p-6 shadow-lg space-y-4">
+                    <div class="flex items-center space-x-3 text-amber-400 border-b border-gray-800 pb-3">
+                        <i class="fa-solid fa-user-ninja text-lg"></i>
+                        <h3 class="font-bold text-lg text-white">怪しいアカウント検知</h3>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">作成からの最小日数</label>
+                        <input type="number" name="account_age_days" value="{{ config.account_age_days }}" class="w-full bg-discord-sidebar border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div class="flex items-center justify-between pt-2">
+                        <span class="text-sm font-medium text-gray-300">初期アイコンを通知</span>
+                        <input type="checkbox" name="check_default_avatar" {% if config.check_default_avatar %}checked{% endif %} class="w-5 h-5 accent-indigo-600 rounded cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- 禁止ワード・ログ設定 -->
+                <div class="bg-discord-card border border-gray-800 rounded-xl p-6 shadow-lg space-y-4 md:col-span-2">
+                    <div class="flex items-center space-x-3 text-red-400 border-b border-gray-800 pb-3">
+                        <i class="fa-solid fa-ban text-lg"></i>
+                        <h3 class="font-bold text-lg text-white">禁止ワード & ログチャンネル</h3>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">禁止ワード（カンマ区切り）</label>
+                        <input type="text" name="banned_words" value="{{ config.banned_words }}" class="w-full bg-discord-sidebar border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">ログ送信チャンネルID</label>
+                        <input type="text" name="log_channel_id" value="{{ config.log_channel_id }}" class="w-full bg-discord-sidebar border border-gray-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500">
+                    </div>
+                </div>
+
+            </div>
+        </form>
+    </main>
+
+</body>
+</html>
